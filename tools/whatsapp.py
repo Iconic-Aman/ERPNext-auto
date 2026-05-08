@@ -1,7 +1,7 @@
 import httpx
-from config import WA_TOKEN, WA_PHONE_ID
+from config import WA_TOKEN, WA_PHONE_ID, WA_API_URL
 
-_BASE = "https://graph.facebook.com/v18.0"
+_BASE = WA_API_URL
 _HEADERS = {"Authorization": f"Bearer {WA_TOKEN}"}
 
 

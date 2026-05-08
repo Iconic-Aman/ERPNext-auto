@@ -28,7 +28,7 @@ Built with **LangGraph + LangChain** (agent orchestration) + **FastAPI** (webhoo
 | Agent Framework | LangChain |
 | API Server | FastAPI + uvicorn |
 | LLM | NVIDIA NIM (Llama 3.1) |
-| Memory | LangGraph Checkpointer (SQLite / Redis) |
+| Memory | LangGraph Checkpointer (MongoDB) |
 | HTTP Client | httpx (async) |
 | WhatsApp | Meta WhatsApp Business API |
 | Email | SMTP |
@@ -39,19 +39,21 @@ Built with **LangGraph + LangChain** (agent orchestration) + **FastAPI** (webhoo
 
 ```
 ERPNext-auto/
-├── main.py                  # FastAPI app — webhook endpoints
-├── config.py                # Env var loader (single source of truth)
-├── checkpointer.py          # LangGraph SQLite/Redis checkpointer
+├── main.py                  # ✅ FastAPI app — webhook endpoints
+├── config.py                # ✅ Env var loader (single source of truth)
+├── checkpointer.py          # ✅ LangGraph MongoDB checkpointer
+├── docker-compose.yml       # ✅ Local dev (FastAPI + MongoDB)
+├── Dockerfile               # ✅ FastAPI Server
 ├── agents/
-│   ├── agent1_crm.py        # Graph 1: Conversation & Qualification (stateful)
+│   ├── agent1_crm.py        # ✅ Graph 1: Conversation & Qualification (stateful)
 │   ├── agent2_projects.py   # Graph 2: Deal Monitor & Project Setup
 │   ├── agent3_billing.py    # Graph 3: Billing Agent
 │   └── agent4_vision.py     # Graph 4: Vision Reconciliation
 ├── tools/
-│   ├── erpnext.py           # httpx wrappers for ERPNext REST API
-│   └── whatsapp.py          # WhatsApp send functions
+│   ├── erpnext.py           # ✅ httpx wrappers for ERPNext REST API
+│   └── whatsapp.py          # ✅ WhatsApp send functions
 ├── state/
-│   └── schemas.py           # TypedDict state schemas for all 4 graphs
+│   └── schemas.py           # ✅ TypedDict state schemas for all 4 graphs
 ├── .env                     # Secrets (gitignored)
 ├── .gitignore
 └── requirements.txt

@@ -1,11 +1,28 @@
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from pymongo import MongoClient
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from config import MONGO_URL
 
-_checkpointer = None
+_saver = None
+_client = None
 
 
-async def get_checkpointer() -> AsyncSqliteSaver:
-    """Returns a shared SQLite checkpointer (dev). Swap for Redis in production."""
-    global _checkpointer
-    if _checkpointer is None:
-        _checkpointer = AsyncSqliteSaver.from_conn_string("checkpoints.db")
-    return _checkpointer
+def init_checkpointer():
+    """Call once at app startup. Opens MongoDB connection and creates the saver."""
+    global _saver, _client
+    _client = MongoClient(MONGO_URL)
+    _saver = MongoDBSaver(_client)
+    return _saver
+
+
+def get_checkpointer() -> MongoDBSaver:
+    """Returns the shared MongoDB checkpointer. Must call init_checkpointer() first."""
+    if _saver is None:
+        raise RuntimeError("Checkpointer not initialized. Call init_checkpointer() first.")
+    return _saver
+
+
+def close_checkpointer():
+    """Call on app shutdown to close the MongoDB connection."""
+    global _client
+    if _client:
+        _client.close()
