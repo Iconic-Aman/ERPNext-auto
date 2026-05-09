@@ -3,17 +3,23 @@ from fastapi import FastAPI, Request, HTTPException
 from langchain_core.messages import HumanMessage
 from checkpointer import init_checkpointer, close_checkpointer
 from agents.agent1_crm import build_agent1_graph
+from agents.agent2_project import build_agent2_graph
 from config import WA_VERIFY
+import logging
+
+log = logging.getLogger(__name__)
 
 # ── Lifespan: init MongoDB on startup, close on shutdown ───────────────────────
 graph_agent1 = None
+graph_agent2 = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global graph_agent1
+    global graph_agent1, graph_agent2
     init_checkpointer()
     graph_agent1 = build_agent1_graph()
-    print("[startup] MongoDB checkpointer ready. Agent 1 compiled.")
+    graph_agent2 = build_agent2_graph()
+    print("[startup] MongoDB checkpointer ready. Agent 1 & 2 compiled.")
     yield
     close_checkpointer()
     print("[shutdown] MongoDB connection closed.")
@@ -73,23 +79,35 @@ async def wa_inbound(request: Request):
 
     elif msg_type == "text":
         body = message["text"]["body"].strip()
+        log.info("[wa_inbound] phone=%s body=%r", phone, body)
 
-        # Approval keyword → Agent 2 (to be built)
-        approval_keywords = ["approved", "let's do it", "yes proceed", "confirm"]
-        if any(kw in body.lower() for kw in approval_keywords):
-            # TODO: invoke graph_agent2
-            return {"status": "ok", "note": "agent2 not yet built"}
-
-        # Normal conversation → Agent 1 (thread_id = phone for multi-turn memory)
-        await graph_agent1.ainvoke(
-            {
-                "messages": [HumanMessage(content=body)],
-                "phone":    phone,
-                "qualified": False,
-                "lead_data": None,
-            },
-            config={"configurable": {"thread_id": phone}},
-        )
+        # Approval keyword → Agent 2
+        APPROVAL_KEYWORDS = [
+            "approved", "let's do it", "yes proceed", "confirm",
+            "i approve", "go ahead", "looks good", "yes", "ok proceed",
+        ]
+        try:
+            if any(kw in body.lower() for kw in APPROVAL_KEYWORDS):
+                log.info("[wa_inbound] Approval detected from %s → Agent 2", phone)
+                await graph_agent2.ainvoke(
+                    {"phone": phone, "quotation_name": None, "customer_name": None,
+                     "service_item": None, "project_name": None, "task_names": []},
+                    config={"configurable": {"thread_id": f"agent2_{phone}"}},
+                )
+            else:
+                # Normal conversation → Agent 1
+                await graph_agent1.ainvoke(
+                    {
+                        "messages": [HumanMessage(content=body)],
+                        "phone":    phone,
+                        "qualified": False,
+                        "lead_data": None,
+                    },
+                    config={"configurable": {"thread_id": phone}},
+                )
+        except Exception as e:
+            log.error("[wa_inbound] Agent error: %s", e, exc_info=True)
+            return {"status": "error", "detail": str(e)}
 
     return {"status": "ok"}
 

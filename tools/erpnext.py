@@ -92,21 +92,33 @@ def fetch_pdf(doctype: str, name: str) -> bytes:
 
 # ── Phase 2 ──────────────────────────────────────────────────────────────────
 
+def get_lead_by_phone(phone: str) -> dict:
+    """Return the first Lead whose mobile_no matches the given phone number."""
+    log.debug("[get_lead_by_phone] looking up phone=%s", phone)
+    data = _get("/api/resource/Lead", {
+        "filters": f'[["mobile_no","like","%{phone[-10:]}%"]]',
+        "fields":  '["name","lead_name","mobile_no","email_id"]',
+        "limit":   1,
+    })
+    result = data[0] if data else {}
+    log.info("[get_lead_by_phone] found=%s", result.get("name"))
+    return result
+
+
 def get_latest_quotation(lead_name: str) -> dict:
     data = _get("/api/resource/Quotation", {
         "filters": f'[["party_name","=","{lead_name}"]]',
-        "fields":  '["name","party_name","items"]',
+        "fields":  '["name","party_name","items","status"]',
         "limit":   1,
     })
     return data[0] if data else {}
 
 
-def create_project(customer: str, quotation_name: str) -> dict:
+def create_project(lead_name: str, quotation_name: str) -> dict:
     return _post("/api/resource/Project", {
-        "project_name": f"Project – {customer}",
+        "project_name": f"Project – {lead_name}",
         "status":       "Open",
-        "customer":     customer,
-        "notes":        f"Quotation: {quotation_name}",
+        "notes":        f"Quotation: {quotation_name} | Lead: {lead_name}",
     })
 
 

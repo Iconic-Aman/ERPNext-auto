@@ -41,20 +41,32 @@ def converse(state: Agent1State) -> Agent1State:
     messages = state.get("messages", [])
     response = llm.invoke([SystemMessage(content=SYSTEM_PROMPT)] + messages)
     content = response.content
+    log.debug("[converse] LLM response: %r", content[:200])
 
     if "QUALIFIED:" in content:
-        # Extract JSON
         json_str = content.split("QUALIFIED:")[1].strip()
         try:
             lead_data = json.loads(json_str)
         except json.JSONDecodeError:
+            log.warning("[converse] Failed to parse QUALIFIED JSON: %r", json_str)
             lead_data = {}
-            
-        # Send any text before the QUALIFIED block if present
+
+        # Validate all required fields are present and non-empty
+        required = ["name", "email", "service", "budget", "timeline"]
+        missing = [f for f in required if not lead_data.get(f, "").strip()]
+
+        if missing:
+            log.warning("[converse] QUALIFIED JSON missing fields: %s — continuing conversation", missing)
+            # LLM fired QUALIFIED too early; keep chatting
+            send_text(state["phone"], content.split("QUALIFIED:")[0].strip() or "Can you share the missing details?")
+            return {"messages": [response], "qualified": False}
+
+        # All fields present — qualify the lead
         reply_text = content.split("QUALIFIED:")[0].strip()
         if reply_text:
             send_text(state["phone"], reply_text)
 
+        log.info("[converse] Lead qualified: %s", lead_data)
         return {
             "messages": [response],
             "qualified": True,
