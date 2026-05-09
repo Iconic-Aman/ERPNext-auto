@@ -16,7 +16,7 @@ graph TD
     end
 
     subgraph Phase 3
-        Agent3[Agent 3: Billing & Invoicing<br/><i>Sales Invoice, Email PDF</i>]:::pending
+        Agent3[Agent 3: Billing & Invoicing<br/><i>Sales Invoice, Email PDF</i>]:::completed
     end
 
     subgraph Phase 4
