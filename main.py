@@ -79,31 +79,35 @@ async def wa_inbound(request: Request):
 
     elif msg_type == "text":
         body = message["text"]["body"].strip()
+        log.info("[wa_inbound] phone=%s body=%r", phone, body)
 
         # Approval keyword → Agent 2
         APPROVAL_KEYWORDS = [
             "approved", "let's do it", "yes proceed", "confirm",
             "i approve", "go ahead", "looks good", "yes", "ok proceed",
         ]
-        if any(kw in body.lower() for kw in APPROVAL_KEYWORDS):
-            log.info("[wa_inbound] Approval detected from %s → Agent 2", phone)
-            await graph_agent2.ainvoke(
-                {"phone": phone, "quotation_name": None, "customer_name": None,
-                 "service_item": None, "project_name": None, "task_names": []},
-                config={"configurable": {"thread_id": f"agent2_{phone}"}},
-            )
-            return {"status": "ok"}
-
-        # Normal conversation → Agent 1 (thread_id = phone for multi-turn memory)
-        await graph_agent1.ainvoke(
-            {
-                "messages": [HumanMessage(content=body)],
-                "phone":    phone,
-                "qualified": False,
-                "lead_data": None,
-            },
-            config={"configurable": {"thread_id": phone}},
-        )
+        try:
+            if any(kw in body.lower() for kw in APPROVAL_KEYWORDS):
+                log.info("[wa_inbound] Approval detected from %s → Agent 2", phone)
+                await graph_agent2.ainvoke(
+                    {"phone": phone, "quotation_name": None, "customer_name": None,
+                     "service_item": None, "project_name": None, "task_names": []},
+                    config={"configurable": {"thread_id": f"agent2_{phone}"}},
+                )
+            else:
+                # Normal conversation → Agent 1
+                await graph_agent1.ainvoke(
+                    {
+                        "messages": [HumanMessage(content=body)],
+                        "phone":    phone,
+                        "qualified": False,
+                        "lead_data": None,
+                    },
+                    config={"configurable": {"thread_id": phone}},
+                )
+        except Exception as e:
+            log.error("[wa_inbound] Agent error: %s", e, exc_info=True)
+            return {"status": "error", "detail": str(e)}
 
     return {"status": "ok"}
 
