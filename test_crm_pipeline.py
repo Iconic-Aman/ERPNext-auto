@@ -5,7 +5,7 @@ load_dotenv()
 from tools.erpnext import create_lead, create_opportunity, create_quotation, fetch_pdf
 
 name     = "Aman Test"
-phone    = os.getenv("WHATSAPP_PHONE_NUMBER", "917739704188")
+phone    = os.getenv("WHATSAPP_PHONE_NUMBER")
 email    = "aman@gmail.com"
 service  = "Website Design"
 budget   = "10k"
