@@ -16,22 +16,23 @@ class LeadAlreadyExistsError(Exception):
 
 
 def _post(endpoint: str, data: dict) -> dict:
-    r = httpx.post(f"{ERPNEXT_BASE_URL}{endpoint}", headers=HEADERS, json=data, timeout=15)
+    r = httpx.post(f"{ERPNEXT_BASE_URL}{endpoint}", headers=HEADERS, json=data, timeout=60)
     r.raise_for_status()
     return r.json().get("data", {})
 
 
 def _get(endpoint: str, params: dict = None) -> dict | list:
-    r = httpx.get(f"{ERPNEXT_BASE_URL}{endpoint}", headers=HEADERS, params=params, timeout=15)
+    r = httpx.get(f"{ERPNEXT_BASE_URL}{endpoint}", headers=HEADERS, params=params, timeout=60)
     r.raise_for_status()
     return r.json().get("data", {})
 
 
 def _submit(doctype: str, name: str) -> dict:
-    r = httpx.post(
-        f"{ERPNEXT_BASE_URL}/api/resource/{doctype}/{name}/submit",
+    r = httpx.put(
+        f"{ERPNEXT_BASE_URL}/api/resource/{doctype}/{name}",
         headers=HEADERS,
-        timeout=15,
+        json={"docstatus": 1},
+        timeout=60,
     )
     r.raise_for_status()
     return r.json().get("data", {})

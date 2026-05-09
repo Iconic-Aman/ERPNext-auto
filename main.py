@@ -4,6 +4,7 @@ from langchain_core.messages import HumanMessage
 from checkpointer import init_checkpointer, close_checkpointer
 from agents.agent1_crm import build_agent1_graph
 from agents.agent2_project import build_agent2_graph
+from agents.agent3_billing import build_agent3_graph
 from config import WA_VERIFY
 import logging
 
@@ -12,14 +13,16 @@ log = logging.getLogger(__name__)
 # ── Lifespan: init MongoDB on startup, close on shutdown ───────────────────────
 graph_agent1 = None
 graph_agent2 = None
+graph_agent3 = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global graph_agent1, graph_agent2
+    global graph_agent1, graph_agent2, graph_agent3
     init_checkpointer()
     graph_agent1 = build_agent1_graph()
     graph_agent2 = build_agent2_graph()
-    print("[startup] MongoDB checkpointer ready. Agent 1 & 2 compiled.")
+    graph_agent3 = build_agent3_graph()
+    print("[startup] MongoDB checkpointer ready. Agents 1, 2, 3 compiled.")
     yield
     close_checkpointer()
     print("[shutdown] MongoDB connection closed.")
@@ -125,9 +128,32 @@ async def quotation_accepted(request: Request):
 @app.post("/webhook/task-completed")
 async def task_completed(request: Request):
     payload = await request.json()
-    # TODO: invoke graph_agent3 when built
-    print(f"[webhook] Task completed in project: {payload.get('project')}")
-    return {"status": "ok", "note": "agent3 not yet built"}
+    project_name = payload.get("project")
+    
+    if not project_name:
+        return {"status": "ignored", "note": "No project in task"}
+
+    log.info("[webhook] Task completed in project: %s", project_name)
+    
+    # Run Agent 3 to check if all tasks are done and send invoice
+    # In a real setup, you'd fetch the user's phone from the project details
+    # For testing, we use the default env var if we don't have the phone
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    phone = os.getenv("WHATSAPP_PHONE_NUMBER", "").lstrip("+")
+
+    await graph_agent3.ainvoke(
+        {
+            "project_name": project_name, 
+            "phone": phone,
+            "all_done": False,
+            "quotation_name": None,
+            "invoice_name": None
+        },
+        config={"configurable": {"thread_id": f"agent3_{project_name}"}},
+    )
+    return {"status": "ok", "note": "agent3 invoked"}
 
 
 @app.post("/webhook/invoice-submitted")
