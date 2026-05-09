@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+httpx
+python-dotenv
+langchain
+langchain-core
+langchain-openai
+langchain-nvidia-ai-endpoints
+langgraph
+langgraph-checkpoint-sqlite
+langgraph-checkpoint-mongodb
+aiosqlite
+pymongo
+pydantic

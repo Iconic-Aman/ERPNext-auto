@@ -1,0 +1,31 @@
+services:
+
+  # ── MongoDB – LangGraph Checkpointer ─────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: erpnext-auto-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: erpnext_auto
+
+  # ── FastAPI – Agent Server ────────────────────────────────────────────────────
+  agent_server:
+    build: .
+    container_name: erpnext-auto-server
+    restart: unless-stopped
+    ports:
+      - "10000:8000"
+    env_file:
+      - .env
+    environment:
+      MONGO_URL: mongodb://mongodb:27017/
+      ERPNEXT_BASE_URL: http://host.containers.internal:8000
+    depends_on:
+      - mongodb
+
+volumes:
+  mongo_data:
