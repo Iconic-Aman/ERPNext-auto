@@ -1,10 +1,18 @@
 import httpx
+import logging
 from config import ERPNEXT_BASE_URL, ERPNEXT_API_KEY, ERPNEXT_API_SECRET
+
+log = logging.getLogger(__name__)
 
 HEADERS = {
     "Authorization": f"token {ERPNEXT_API_KEY}:{ERPNEXT_API_SECRET}",
     "Content-Type": "application/json",
 }
+
+
+class LeadAlreadyExistsError(Exception):
+    """Raised when a Lead with the same name already exists in ERPNext."""
+    pass
 
 
 def _post(endpoint: str, data: dict) -> dict:
@@ -32,13 +40,26 @@ def _submit(doctype: str, name: str) -> dict:
 # ── Phase 1 ──────────────────────────────────────────────────────────────────
 
 def create_lead(name: str, phone: str, email: str, service: str, budget: str, timeline: str) -> dict:
-    return _post("/api/resource/Lead", {
-        "lead_name":  name,
-        "email_id":   email,
-        "mobile_no":  phone,
-        "status":     "Open",
-        "notes":      [{"note": f"Service: {service} | Budget: {budget} | Timeline: {timeline}"}],
-    })
+    log.debug("[create_lead] name=%s phone=%s email=%s", name, phone, email)
+    r = httpx.post(
+        f"{ERPNEXT_BASE_URL}/api/resource/Lead",
+        headers=HEADERS,
+        json={
+            "lead_name": name,
+            "email_id":  email,
+            "mobile_no": phone,
+            "status":    "Open",
+            "notes":     [{"note": f"Service: {service} | Budget: {budget} | Timeline: {timeline}"}],
+        },
+        timeout=15,
+    )
+    if r.status_code == 409:
+        log.warning("[create_lead] 409 – lead '%s' already exists", name)
+        raise LeadAlreadyExistsError(name)
+    r.raise_for_status()
+    data = r.json().get("data", {})
+    log.info("[create_lead] created → %s", data.get("name"))
+    return data
 
 
 def create_opportunity(lead_name: str) -> dict:
@@ -52,10 +73,9 @@ def create_opportunity(lead_name: str) -> dict:
 
 def create_quotation(lead_name: str, item_code: str) -> dict:
     return _post("/api/resource/Quotation", {
-        "quotation_to":      "Lead",
-        "party_name":        lead_name,
-        "items":             [{"item_code": item_code, "qty": 1}],
-        "taxes_and_charges": "GST 18%",
+        "quotation_to": "Lead",
+        "party_name":   lead_name,
+        "items":        [{"item_code": item_code, "qty": 1}],
     })
 
 

@@ -2,10 +2,13 @@ from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage
 from state.schemas import Agent1State
-from tools.erpnext import create_lead, create_opportunity, create_quotation, fetch_pdf
+from tools.erpnext import create_lead, create_opportunity, create_quotation, fetch_pdf, LeadAlreadyExistsError
 from tools.whatsapp import send_text, send_document
 from config import NVIDIA_API_KEY, NVIDIA_API_URL, LLM_MODEL
 import json
+import logging
+
+log = logging.getLogger(__name__)
 
 llm = ChatOpenAI(
     base_url=NVIDIA_API_URL,    
@@ -25,6 +28,7 @@ Your goal is to collect the following through natural conversation:
 4. Their name and email
 
 Rules:
+- Always respond in very very short answer 
 - Be friendly, professional, and concise
 - Ask one question at a time
 - Do not mention internal systems or ERPNext
@@ -63,18 +67,43 @@ def converse(state: Agent1State) -> Agent1State:
 def create_crm_records(state: Agent1State) -> Agent1State:
     d = state.get("lead_data", {})
     phone = state["phone"]
-    
-    # Create CRM records
-    lead = create_lead(d.get("name", "Unknown"), phone, d.get("email", ""), d.get("service", ""), d.get("budget", ""), d.get("timeline", ""))
-    opp = create_opportunity(lead["name"])
-    
-    # We use d["service"] as the item_code. Make sure this matches an Item in ERPNext.
-    quote = create_quotation(lead["name"], d.get("service", "Standard Service"))
-    
-    # Send Quotation PDF
-    pdf_bytes = fetch_pdf("Quotation", quote["name"])
-    send_document(phone, pdf_bytes, f"Quotation-{quote['name']}.pdf", "Here is your quotation!")
-    
+    name = d.get("name", "Unknown")
+
+    log.info("[create_crm_records] Starting for lead='%s' phone='%s'", name, phone)
+
+    try:
+        lead = create_lead(name, phone, d.get("email", ""), d.get("service", ""), d.get("budget", ""), d.get("timeline", ""))
+    except LeadAlreadyExistsError:
+        log.warning("[create_crm_records] Lead '%s' already exists", name)
+        send_text(phone, f"A lead with the name *{name}* already exists. Please use a different name and start again.")
+        return {}
+    except Exception as e:
+        log.error("[create_crm_records] create_lead failed: %s", e)
+        send_text(phone, "Sorry, something went wrong creating your lead. Please try again.")
+        return {}
+
+    try:
+        opp = create_opportunity(lead["name"])
+        log.info("[create_crm_records] Opportunity created: %s", opp.get("name"))
+    except Exception as e:
+        log.error("[create_crm_records] create_opportunity failed: %s", e)
+
+    try:
+        quote = create_quotation(lead["name"], "Standard Service")
+        log.info("[create_crm_records] Quotation created: %s", quote.get("name"))
+    except Exception as e:
+        log.error("[create_crm_records] create_quotation failed: %s", e)
+        send_text(phone, "Lead created but quotation generation failed. Our team will follow up.")
+        return {}
+
+    try:
+        pdf_bytes = fetch_pdf("Quotation", quote["name"])
+        send_document(phone, pdf_bytes, f"Quotation-{quote['name']}.pdf", "Here is your quotation!")
+        log.info("[create_crm_records] PDF sent to %s", phone)
+    except Exception as e:
+        log.error("[create_crm_records] fetch/send PDF failed: %s", e)
+        send_text(phone, "Your quotation is ready but we couldn't send the PDF. Our team will share it shortly.")
+
     return {}
 
 def route_after_converse(state: Agent1State) -> str:

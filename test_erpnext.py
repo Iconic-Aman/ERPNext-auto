@@ -4,9 +4,9 @@ def test():
     print("Testing create_lead...")
     try:
         lead = create_lead(
-            name="Test User",
-            phone="+1234567890",
-            email="test@example.com",
+            name="Test User2",
+            phone="+123456789",
+            email="aman@example.com",
             service="Website Design",
             budget="1000",
             timeline="1 week"

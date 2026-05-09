@@ -23,6 +23,7 @@ services:
       - .env
     environment:
       MONGO_URL: mongodb://mongodb:27017/
+      ERPNEXT_BASE_URL: http://host.containers.internal:8000
     depends_on:
       - mongodb
 
