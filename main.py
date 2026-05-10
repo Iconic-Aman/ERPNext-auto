@@ -5,6 +5,7 @@ from checkpointer import init_checkpointer, close_checkpointer
 from agents.agent1_crm import build_agent1_graph
 from agents.agent2_project import build_agent2_graph
 from agents.agent3_billing import build_agent3_graph
+from agents.agent4_vision import build_agent4_graph
 from config import WA_VERIFY
 import logging
 
@@ -14,15 +15,17 @@ log = logging.getLogger(__name__)
 graph_agent1 = None
 graph_agent2 = None
 graph_agent3 = None
+graph_agent4 = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global graph_agent1, graph_agent2, graph_agent3
+    global graph_agent1, graph_agent2, graph_agent3, graph_agent4
     init_checkpointer()
     graph_agent1 = build_agent1_graph()
     graph_agent2 = build_agent2_graph()
     graph_agent3 = build_agent3_graph()
-    print("[startup] MongoDB checkpointer ready. Agents 1, 2, 3 compiled.")
+    graph_agent4 = build_agent4_graph()
+    print("[startup] MongoDB checkpointer ready. Agents 1, 2, 3, 4 compiled.")
     yield
     close_checkpointer()
     print("[shutdown] MongoDB connection closed.")
@@ -76,9 +79,18 @@ async def wa_inbound(request: Request):
         raise HTTPException(status_code=400, detail="Bad payload structure")
 
     if msg_type == "image":
-        # Phase 4 – Vision Reconciliation (Agent 4 — to be built)
-        # TODO: invoke graph_agent4
-        return {"status": "ok", "note": "agent4 not yet built"}
+        # Phase 4 – Vision Reconciliation (Agent 4)
+        image_id = message["image"]["id"]
+        log.info("[wa_inbound] Image received from %s → Agent 4", phone)
+        try:
+            await graph_agent4.ainvoke(
+                {"phone": phone, "image_media_id": image_id},
+                config={"configurable": {"thread_id": f"pay_{phone}"}},
+            )
+        except Exception as e:
+            log.error("[wa_inbound] Agent 4 error: %s", e, exc_info=True)
+            return {"status": "error", "detail": str(e)}
+        return {"status": "ok"}
 
     elif msg_type == "text":
         body = message["text"]["body"].strip()
