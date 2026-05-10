@@ -25,5 +25,6 @@ class Agent3State(TypedDict):
 class Agent4State(TypedDict):
     phone: str
     image_media_id: str
+    _image_b64: Optional[str]
     txn_data: Optional[dict]   # {transaction_id, amount, date, sender_name}
     matched_invoice: Optional[str]
